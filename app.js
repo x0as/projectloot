@@ -150,7 +150,11 @@ app.get('/:codePath', (req, res) => {
   if (!entry) {
     return res.status(404).send('Code not found or expired.');
   }
-  res.send(`<h1>${entry.type === 'nitro' ? 'High Rewards (Nitro)' : 'Deco & Nameplates'}</h1><pre style="font-size:2em;">${entry.code}</pre>`);
+  res.send(`
+    <h1>${entry.type === 'nitro' ? 'High Rewards (Nitro)' : 'Deco & Nameplates'}</h1>
+    <p style="font-size:1.2em; color:#333;">Here is your Code. Send it inside your ticket or share it with the Admins.</p>
+    <pre style="font-size:2em; background:#f4f4f4; padding:1em; border-radius:8px;">${entry.code}</pre>
+  `);
 });
 
 const PORT = process.env.PORT || 3000;
