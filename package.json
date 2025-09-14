@@ -4,7 +4,7 @@
   "description": "Pastebin code rotator with Discord webhook integration.",
   "main": "rotator.js",
   "scripts": {
-    "start": "node rotator.js"
+    "start": "node app.js"
   },
   "dependencies": {
   "axios": "^1.6.0",
