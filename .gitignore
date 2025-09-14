@@ -1,0 +1,4 @@
+node_modules/
+.env
+current_nitro_url.txt
+current_deco_url.txt
