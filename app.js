@@ -1,8 +1,10 @@
 require('dotenv').config();
 const axios = require('axios');
-const fs = require('fs');
 const express = require('express');
 const app = express();
+
+// In-memory store for codes and their types
+const codeStore = {};
 
 // === CONFIG ===
 const DEV_KEY = process.env.DEV_KEY;
@@ -13,6 +15,11 @@ const WEBHOOK_URL = process.env.WEBHOOK_URL;
 // Generate a random 16-character alphanumeric code
 function generateCode() {
   return Array.from({length: 16}, () => Math.floor(Math.random() * 36).toString(36)).join('').toUpperCase();
+}
+
+// Generate a random 6-character alphanumeric path
+function generatePath() {
+  return Array.from({length: 6}, () => Math.floor(Math.random() * 36).toString(36)).join('').toUpperCase();
 }
 
 // Helper to extract paste key from a Pastebin URL
@@ -108,58 +115,42 @@ async function createPaste(newCode, label, prevUrlFile) {
 }
 
 // Send message to Discord webhook
-async function postDiscord(label, code) {
+async function postDiscord(label, code, url) {
   try {
     await axios.post(WEBHOOK_URL, {
-      content: `**[${label}]** New code: \`${code}\``
+      content: `**[${label}]** New code: \`${code}\`\n${url}`
     });
   } catch (err) {
     console.error("Discord error:", err.message);
   }
 }
 
-// Main rotate function
-async function rotate() {
-  // Nitro
-  const nitroCode = generateCode();
-  const nitroPasteUrl = await createPaste(nitroCode, "High Rewards (Nitro)", "current_nitro_url.txt");
-  if (nitroPasteUrl) {
-    fs.writeFileSync("current_nitro_url.txt", nitroPasteUrl);
-    await postDiscord("High Rewards (Nitro)", nitroCode + "\n" + nitroPasteUrl);
-  }
 
-  // Deco
-  const decoCode = generateCode();
-  const decoPasteUrl = await createPaste(decoCode, "Deco & Nameplates", "current_deco_url.txt");
-  if (decoPasteUrl) {
-    fs.writeFileSync("current_deco_url.txt", decoPasteUrl);
-    await postDiscord("Deco & Nameplates", decoCode + "\n" + decoPasteUrl);
-  }
-
-  console.log("Updated codes at", new Date().toLocaleTimeString());
+// Route handler to generate and redirect to a new code URL
+async function handleCodeRequest(type, label, req, res) {
+  const code = generateCode();
+  const path = generatePath();
+  codeStore[path] = { code, type, created: Date.now() };
+  const fullUrl = `${req.protocol}://${req.get('host')}/${path}`;
+  await postDiscord(label, code, fullUrl);
+  res.redirect(`/${path}`);
 }
 
-// Run immediately, then every 5 minutes
-rotate();
-setInterval(rotate, 5 * 60 * 1000);
-
-// Express redirect endpoints
 app.get('/nitro', (req, res) => {
-  try {
-    const url = fs.readFileSync('current_nitro_url.txt', 'utf8').trim();
-    res.redirect(url);
-  } catch (e) {
-    res.status(404).send('No Nitro URL found');
-  }
+  handleCodeRequest('nitro', 'High Rewards (Nitro)', req, res);
 });
 
 app.get('/deco', (req, res) => {
-  try {
-    const url = fs.readFileSync('current_deco_url.txt', 'utf8').trim();
-    res.redirect(url);
-  } catch (e) {
-    res.status(404).send('No Deco URL found');
+  handleCodeRequest('deco', 'Deco & Nameplates', req, res);
+});
+
+// Show the code at the unique URL
+app.get('/:codePath', (req, res) => {
+  const entry = codeStore[req.params.codePath.toUpperCase()];
+  if (!entry) {
+    return res.status(404).send('Code not found or expired.');
   }
+  res.send(`<h1>${entry.type === 'nitro' ? 'High Rewards (Nitro)' : 'Deco & Nameplates'}</h1><pre style="font-size:2em;">${entry.code}</pre>`);
 });
 
 const PORT = process.env.PORT || 3000;
