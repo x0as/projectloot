@@ -41,17 +41,49 @@ async function deletePaste(pasteKey) {
   }
 }
 
-// Create a new Pastebin paste with the new code, deleting the previous one if present
-async function createPaste(newCode, label, prevUrlFile) {
-  // Delete previous paste if exists
+// List all pastes for the user
+async function listPastes() {
   try {
-    if (fs.existsSync(prevUrlFile)) {
-      const prevUrl = fs.readFileSync(prevUrlFile, 'utf8').trim();
-      const prevKey = extractPasteKey(prevUrl);
-      await deletePaste(prevKey);
+    const body = new URLSearchParams({
+      api_dev_key: DEV_KEY,
+      api_user_key: USER_KEY,
+      api_option: "list",
+      api_results_limit: "1000"
+    });
+    const r = await axios.post("https://pastebin.com/api/api_post.php", body);
+    if (typeof r.data === 'string' && r.data.startsWith('<')) {
+      return r.data;
     }
+    return null;
+  } catch (err) {
+    console.error("Failed to list pastes:", err.response?.data || err.message);
+    return null;
+  }
+}
+
+// Delete all pastes with a given label (title)
+async function deleteAllPastesWithLabel(label) {
+  const xml = await listPastes();
+  if (!xml) return;
+  const regex = /<paste>([\s\S]*?)<\/paste>/g;
+  let match;
+  while ((match = regex.exec(xml)) !== null) {
+    const pasteBlock = match[1];
+    const keyMatch = pasteBlock.match(/<paste_key>(.*?)<\/paste_key>/);
+    const titleMatch = pasteBlock.match(/<paste_title>(.*?)<\/paste_title>/);
+    if (keyMatch && titleMatch && titleMatch[1] === label) {
+      await deletePaste(keyMatch[1]);
+    }
+  }
+}
+
+// Create a new Pastebin paste with the new code, deleting all previous ones with the same label
+async function createPaste(newCode, label, prevUrlFile) {
+  // Delete all previous pastes with this label
+  try {
+    await deleteAllPastesWithLabel(label);
   } catch (e) {
-    console.error("Error deleting previous paste:", e.message);
+    console.error("Error deleting previous pastes:", e.message);
   }
   // Create new paste
   try {
