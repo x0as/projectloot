@@ -15,8 +15,45 @@ function generateCode() {
   return Array.from({length: 16}, () => Math.floor(Math.random() * 36).toString(36)).join('').toUpperCase();
 }
 
-// Create a new Pastebin paste with the new code
-async function createPaste(newCode, label) {
+// Helper to extract paste key from a Pastebin URL
+function extractPasteKey(url) {
+  if (!url) return null;
+  const match = url.match(/pastebin\.com\/(\w+)/);
+  return match ? match[1] : null;
+}
+
+// Delete a Pastebin paste by key
+async function deletePaste(pasteKey) {
+  if (!pasteKey) return;
+  try {
+    const body = new URLSearchParams({
+      api_dev_key: DEV_KEY,
+      api_user_key: USER_KEY,
+      api_option: "delete",
+      api_paste_key: pasteKey
+    });
+    const r = await axios.post("https://pastebin.com/api/api_post.php", body);
+    if (r.data !== 'Paste Removed') {
+      console.error("Failed to delete paste:", r.data);
+    }
+  } catch (err) {
+    console.error("Delete paste error:", err.response?.data || err.message);
+  }
+}
+
+// Create a new Pastebin paste with the new code, deleting the previous one if present
+async function createPaste(newCode, label, prevUrlFile) {
+  // Delete previous paste if exists
+  try {
+    if (fs.existsSync(prevUrlFile)) {
+      const prevUrl = fs.readFileSync(prevUrlFile, 'utf8').trim();
+      const prevKey = extractPasteKey(prevUrl);
+      await deletePaste(prevKey);
+    }
+  } catch (e) {
+    console.error("Error deleting previous paste:", e.message);
+  }
+  // Create new paste
   try {
     const body = new URLSearchParams({
       api_dev_key: DEV_KEY,
@@ -53,7 +90,7 @@ async function postDiscord(label, code) {
 async function rotate() {
   // Nitro
   const nitroCode = generateCode();
-  const nitroPasteUrl = await createPaste(nitroCode, "High Rewards (Nitro)");
+  const nitroPasteUrl = await createPaste(nitroCode, "High Rewards (Nitro)", "current_nitro_url.txt");
   if (nitroPasteUrl) {
     fs.writeFileSync("current_nitro_url.txt", nitroPasteUrl);
     await postDiscord("High Rewards (Nitro)", nitroCode + "\n" + nitroPasteUrl);
@@ -61,7 +98,7 @@ async function rotate() {
 
   // Deco
   const decoCode = generateCode();
-  const decoPasteUrl = await createPaste(decoCode, "Deco & Nameplates");
+  const decoPasteUrl = await createPaste(decoCode, "Deco & Nameplates", "current_deco_url.txt");
   if (decoPasteUrl) {
     fs.writeFileSync("current_deco_url.txt", decoPasteUrl);
     await postDiscord("Deco & Nameplates", decoCode + "\n" + decoPasteUrl);
