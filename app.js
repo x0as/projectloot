@@ -139,9 +139,9 @@ async function rotate() {
   console.log("Updated codes at", new Date().toLocaleTimeString());
 }
 
-// Run immediately, then every 60s
+// Run immediately, then every 5 minutes
 rotate();
-setInterval(rotate, 60 * 1000);
+setInterval(rotate, 5 * 60 * 1000);
 
 // Express redirect endpoints
 app.get('/nitro', (req, res) => {
